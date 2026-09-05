@@ -70,3 +70,37 @@ Finest Computer Use is an external, deterministic safety supervisor designed for
   Defines the 6 risk levels, semantic matching rules, forbidden keyword pairs, and fallback classifications for degraded modes.
 - **`deploy_firewall.py`**:
   Ensures safe, atomic updates of firewall scripts using staging directories, `py_compile` checks, isolated import tests, and `.last_known_good` rollbacks.
+- **`bootstrap.py`**:
+  Orchestrates onboarding on fresh machines: preflight checks, Antigravity discovery, Peekaboo configuration, MCP merger, safety installation, and post-install doctor validation.
+- **`doctor.py`**:
+  Standalone diagnostic inspector reporting full system readiness and actionable guidance with standard exit codes.
+
+---
+
+## 3. Trust Boundary
+
+Finest Computer Use is an independent safety layer with clearly separated operational boundaries:
+
+```text
+Antigravity (Agent Engine)
+    ↓  PreToolUse Hook (<20ms)
+Finest Computer Use (Deterministic Policy & Invasiveness Firewall)
+    ↓  Allowed tool calls
+Peekaboo (macOS Model Context Protocol Server)
+    ↓  System Calls
+macOS 15+ (Sequoia TCC & Accessibility Subsystem)
+```
+
+- **Antigravity** owns user session management, agent prompt evaluation, and hook triggering.
+- **Finest Computer Use** owns deterministic invariant enforcement, side-effect budgets, and mutation barrier state.
+- **Peekaboo** owns accessibility automation, screenshot capture, and event synthesis.
+- **macOS** owns operating-system security, SIP, and user privacy consent (TCC).
+
+---
+
+## 4. Testing & Verification Levels
+
+The architecture is verified across three distinct confidence tiers:
+- **Level 1 — Portable (CI-safe):** AST compilation, isolated imports, contract lattices, recovery state transitions, and mock UI pipelines executed in headless environments (Linux / macOS).
+- **Level 2 — Clean Environment Simulation:** Isolated temporary `$HOME` fixtures testing fresh bootstrap, idempotence, MCP merging, config preservation, failure injection, and uninstall.
+- **Level 3 — Real Host Mac Integration:** Actual Antigravity runtime, live Peekaboo MCP, macOS Accessibility & Screen Recording TCC permissions, and non-invasive smoke tests.

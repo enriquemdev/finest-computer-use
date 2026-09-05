@@ -1,0 +1,29 @@
+{
+  "computer-use-safety": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.gemini/config/skills/computer-use/scripts/safe_interact.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.gemini/config/skills/computer-use/scripts/safe_interact.py post",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "computer-use-safety",
+  "version": "1.0.0",
+  "description": "Hardened Non-Invasive Computer Use & Intent/Effect Firewall hook for Antigravity",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "command": "python3 ~/.gemini/config/skills/computer-use/scripts/safe_interact.py"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "command": "python3 ~/.gemini/config/skills/computer-use/scripts/safe_interact.py post"
+      }
+    ]
+  }
+}

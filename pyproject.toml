@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finest-computer-use"
+version = "1.0.0"
+description = "macOS Computer Use Safety Architecture: PreToolUse enforcement, monotonic authorization, Intent/Effect Firewall, and fail-safe degraded mode."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Enrique Munoz"}
+]
+keywords = [
+    "computer-use",
+    "ai-agent",
+    "safety",
+    "macOS",
+    "firewall",
+    "antigravity",
+    "peekaboo",
+    "authorization"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+[project.urls]
+Homepage = "https://github.com/enriquemdev/finest-computer-use"
+Repository = "https://github.com/enriquemdev/finest-computer-use.git"
+Issues = "https://github.com/enriquemdev/finest-computer-use/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]

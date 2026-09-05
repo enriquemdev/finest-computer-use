@@ -86,26 +86,73 @@ class BootstrapOrchestrator:
 
         return True, f"macOS {mac_ver} ({arch}), Python {sys.version_info.major}.{sys.version_info.minor} OK"
 
+    def _is_valid_app_bundle(self, app_path: str) -> bool:
+        """Verify that an app bundle has the expected macOS structure with an executable."""
+        if not (os.path.isdir(app_path) and app_path.endswith(".app")):
+            return False
+        macos_dir = os.path.join(app_path, "Contents", "MacOS")
+        if not os.path.isdir(macos_dir):
+            return False
+        try:
+            for item in os.listdir(macos_dir):
+                full_item = os.path.join(macos_dir, item)
+                if os.path.isfile(full_item) and os.access(full_item, os.X_OK):
+                    return True
+        except Exception:
+            return False
+        return False
+
     def discover_antigravity(self) -> Tuple[bool, str]:
-        app_candidates = [
-            "/Applications/Antigravity.app",
-            os.path.join(self.home, "Applications/Antigravity.app")
-        ]
-        app_found = any(os.path.exists(p) for p in app_candidates)
-        cli_found = shutil.which("agy") or shutil.which("antigravity")
+        app_candidates = []
+        is_isolated = (self.home != os.path.expanduser("~")) or (os.environ.get("FINEST_ISOLATE_APP_SEARCH") == "1")
+        if os.environ.get("ANTIGRAVITY_APP_PATH"):
+            app_candidates.append(os.environ["ANTIGRAVITY_APP_PATH"])
+        elif is_isolated:
+            app_candidates.append(os.path.join(self.home, "Applications", "Antigravity.app"))
+        else:
+            app_candidates.extend([
+                os.path.join(self.home, "Applications", "Antigravity.app"),
+                "/Applications/Antigravity.app"
+            ])
+
+        app_found = any(self._is_valid_app_bundle(p) for p in app_candidates if os.path.exists(p))
+
+        cli_found = None
+        if is_isolated:
+            fixture_bin = os.path.join(self.home, "bin")
+            for c in ["agy", "antigravity"]:
+                p = os.path.join(fixture_bin, c)
+                if os.path.exists(p) and os.access(p, os.X_OK):
+                    cli_found = p
+                    break
+        else:
+            cli_found = shutil.which("agy") or shutil.which("antigravity")
+
         config_found = os.path.exists(self.gemini_dir)
 
-        if not (app_found or cli_found or config_found):
-            if self.allow_non_darwin or self.dry_run:
-                return True, "Antigravity simulated (portable/dry-run mode)"
-            msg = (
-                "Antigravity application or configuration not found.\n"
-                "  Please install Antigravity before proceeding:\n"
-                "  https://antigravity.google"
-            )
-            return False, msg
+        if app_found or cli_found:
+            details = []
+            if app_found:
+                valid_apps = [p for p in app_candidates if os.path.exists(p) and self._is_valid_app_bundle(p)]
+                details.append(f"Application bundle ({valid_apps[0]})")
+            if cli_found:
+                details.append(f"CLI ({cli_found})")
+            return True, f"Antigravity installation confirmed ({', '.join(details)})"
 
-        return True, "Antigravity detected"
+        if config_found:
+            if self.allow_non_darwin or self.dry_run:
+                return True, "Antigravity configuration present (simulated in portable/dry-run mode)"
+            return False, "Antigravity configuration directory exists (~/.gemini), but application bundle or CLI was not confirmed. Please install Antigravity."
+
+        if self.allow_non_darwin or self.dry_run:
+            return True, "Antigravity simulated (portable/dry-run mode)"
+
+        msg = (
+            "Antigravity application not found in /Applications or PATH.\n"
+            "  Please install Antigravity before proceeding:\n"
+            "  https://antigravity.google"
+        )
+        return False, msg
 
     def discover_peekaboo(self) -> Tuple[Optional[str], Optional[str]]:
         candidates = [
@@ -133,7 +180,7 @@ class BootstrapOrchestrator:
             return peekaboo_bin, f"Error querying version: {e}"
 
     def configure_mcp(self, peekaboo_bin: str) -> Tuple[bool, str]:
-        """Idempotently register Peekaboo in Antigravity mcp_config.json while preserving all existing servers."""
+        """Idempotently register Peekaboo in canonical Antigravity mcp_config.json while preserving all existing servers and keys."""
         if self.skip_mcp:
             return True, "Skipped by --skip-mcp flag."
 
@@ -141,6 +188,7 @@ class BootstrapOrchestrator:
         target_file = self.mcp_config_path
 
         existing_data: Dict[str, Any] = {"mcpServers": {}}
+        backup_path = None
         if os.path.exists(target_file):
             try:
                 with open(target_file, "r", encoding="utf-8") as f:
@@ -173,17 +221,33 @@ class BootstrapOrchestrator:
 
         servers["peekaboo"] = desired_entry
 
+        # Atomic replacement with fsync and post-write validation
+        tmp_target = f"{target_file}.tmp.{os.getpid()}"
         try:
-            with open(target_file, "w", encoding="utf-8") as f:
+            with open(tmp_target, "w", encoding="utf-8") as f:
                 json.dump(existing_data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_target, target_file)
 
-            # Also sync to antigravity/mcp_config.json if the antigravity dir exists
-            if os.path.exists(os.path.dirname(self.antigravity_mcp_path)):
-                with open(self.antigravity_mcp_path, "w", encoding="utf-8") as f:
-                    json.dump(existing_data, f, indent=2)
+            # Validate written file
+            with open(target_file, "r", encoding="utf-8") as f:
+                verified_data = json.load(f)
+            if "peekaboo" not in verified_data.get("mcpServers", {}):
+                raise ValueError("Verification failed: peekaboo entry missing after write")
 
             return True, f"Successfully registered Peekaboo MCP in {target_file}."
         except Exception as e:
+            if backup_path and os.path.exists(backup_path):
+                try:
+                    shutil.copy2(backup_path, target_file)
+                except Exception:
+                    pass
+            if os.path.exists(tmp_target):
+                try:
+                    os.remove(tmp_target)
+                except Exception:
+                    pass
             return False, f"Failed to write updated {target_file}: {e}"
 
     def install_safety_layer(self) -> Tuple[bool, str]:

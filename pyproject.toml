@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "finest-computer-use"
-version = "1.1.0"
+version = "1.1.1"
 description = "macOS Computer Use Safety Architecture: PreToolUse enforcement, monotonic authorization, Intent/Effect Firewall, and fail-safe degraded mode."
 readme = "README.md"
 requires-python = ">=3.9"

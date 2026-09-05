@@ -97,24 +97,116 @@ class SystemDoctor:
                 "Install Python 3.9 or newer."
             ))
 
+    def _is_valid_app_bundle(self, app_path: str) -> bool:
+        """Verify that an app bundle has the expected macOS structure with an executable binary."""
+        if not (os.path.isdir(app_path) and app_path.endswith(".app")):
+            return False
+        macos_dir = os.path.join(app_path, "Contents", "MacOS")
+        if not os.path.isdir(macos_dir):
+            return False
+        try:
+            for entry in os.listdir(macos_dir):
+                entry_path = os.path.join(macos_dir, entry)
+                if os.path.isfile(entry_path) and os.access(entry_path, os.X_OK):
+                    return True
+        except OSError:
+            return False
+        return False
+
+    def probe_peekaboo_mcp(self, peekaboo_bin: Optional[str] = None) -> bool:
+        """Probe whether the peekaboo binary supports the required 'mcp' subcommand."""
+        bin_path = peekaboo_bin or shutil.which("peekaboo")
+        if not bin_path or not os.path.exists(bin_path):
+            return False
+        try:
+            res = subprocess.run([bin_path, "mcp", "--help"], capture_output=True, text=True, timeout=5)
+            return res.returncode == 0
+        except Exception:
+            return False
+
+    def probe_peekaboo_permissions(self, peekaboo_bin: Optional[str] = None) -> Tuple[bool, List[str]]:
+        """Probe whether macOS TCC permissions are granted for Peekaboo."""
+        bin_path = peekaboo_bin or shutil.which("peekaboo")
+        if not bin_path or not os.path.exists(bin_path):
+            return False, ["Binary not found"]
+        try:
+            res = subprocess.run([bin_path, "permissions", "--json"], capture_output=True, text=True, timeout=10)
+            if res.returncode != 0:
+                return False, [f"Exit code {res.returncode}: {res.stderr.strip()}"]
+            data = json.loads(res.stdout).get("data", {})
+            perms = data.get("permissions", [])
+            missing = [p.get("name", "Unknown") for p in perms if p.get("isRequired") and not p.get("isGranted")]
+            if missing:
+                return False, missing
+            return True, []
+        except Exception as e:
+            return False, [str(e)]
+
+    def probe_peekaboo_observation(self, peekaboo_bin: Optional[str] = None) -> Tuple[bool, str]:
+        """Probe whether read-only observation works without invasive side-effects."""
+        bin_path = peekaboo_bin or shutil.which("peekaboo")
+        if not bin_path or not os.path.exists(bin_path):
+            return False, "Binary not found"
+        try:
+            res = subprocess.run([bin_path, "screen", "--json"], capture_output=True, text=True, timeout=10)
+            if res.returncode == 0:
+                return True, "screen observation verified"
+            res_app = subprocess.run([bin_path, "app", "list", "--json"], capture_output=True, text=True, timeout=10)
+            if res_app.returncode == 0:
+                return True, "app list observation verified"
+            return False, f"Observation probe failed: {res.stderr.strip() or res_app.stderr.strip()}"
+        except Exception as e:
+            return False, str(e)
+
+    def probe_peekaboo_capabilities(self, peekaboo_bin: Optional[str] = None) -> Dict[str, Any]:
+        """Comprehensive capability probe for Peekaboo."""
+        bin_path = peekaboo_bin or shutil.which("peekaboo")
+        mcp_ok = self.probe_peekaboo_mcp(bin_path)
+        perms_ok, missing_perms = self.probe_peekaboo_permissions(bin_path) if self.is_macos else (True, [])
+        obs_ok, obs_msg = self.probe_peekaboo_observation(bin_path) if self.is_macos and perms_ok else (False, "TCC required or non-macOS")
+        return {
+            "binary": bin_path,
+            "mcp_support": mcp_ok,
+            "permissions_ok": perms_ok,
+            "missing_permissions": missing_perms,
+            "observation_ok": obs_ok,
+            "observation_detail": obs_msg,
+        }
+
     def check_antigravity(self):
         gemini_dir = os.path.join(self.home, ".gemini")
-        app_candidates = [
-            "/Applications/Antigravity.app",
-            os.path.join(self.home, "Applications/Antigravity.app")
-        ]
-        app_found = any(os.path.exists(p) for p in app_candidates)
-        cli_found = shutil.which("agy") or shutil.which("antigravity")
+        is_isolated = (self.home != os.path.expanduser("~")) or (os.environ.get("FINEST_ISOLATE_APP_SEARCH") == "1")
 
-        if app_found or cli_found or os.path.exists(gemini_dir):
+        app_candidates = []
+        if os.environ.get("ANTIGRAVITY_APP_PATH"):
+            app_candidates.append(os.environ["ANTIGRAVITY_APP_PATH"])
+        elif not is_isolated:
+            app_candidates.append("/Applications/Antigravity.app")
+        app_candidates.append(os.path.join(self.home, "Applications", "Antigravity.app"))
+
+        valid_app = next((p for p in app_candidates if os.path.exists(p) and self._is_valid_app_bundle(p)), None)
+
+        if is_isolated:
+            cli_found = shutil.which("agy", path=os.path.join(self.home, "bin")) or shutil.which("antigravity", path=os.path.join(self.home, "bin"))
+        else:
+            cli_found = shutil.which("agy") or shutil.which("antigravity")
+
+        if valid_app or cli_found:
             details = []
-            if app_found:
-                details.append("Application bundle")
+            if valid_app:
+                details.append(f"Application bundle ({valid_app})")
             if cli_found:
                 details.append(f"CLI ({cli_found})")
             if os.path.exists(gemini_dir):
                 details.append(f"Config dir ({gemini_dir})")
             self.add_check(DoctorCheck("Antigravity Discovery", "PASS", ", ".join(details)))
+        elif os.path.exists(gemini_dir):
+            self.add_check(DoctorCheck(
+                "Antigravity Discovery",
+                "ACTION REQUIRED",
+                f"Config directory exists ({gemini_dir}), but Antigravity application or CLI is NOT confirmed",
+                "Ensure Antigravity.app is installed or 'agy' CLI is in PATH."
+            ))
         else:
             if not self.is_macos:
                 self.add_check(DoctorCheck(
@@ -143,7 +235,16 @@ class SystemDoctor:
             try:
                 res = subprocess.run([peekaboo_bin, "--version"], capture_output=True, text=True, timeout=5)
                 ver_line = res.stdout.strip() or res.stderr.strip()
-                self.add_check(DoctorCheck("Peekaboo Binary", "PASS", f"{peekaboo_bin} ({ver_line})"))
+                mcp_ok = self.probe_peekaboo_mcp(peekaboo_bin)
+                if not mcp_ok:
+                    self.add_check(DoctorCheck(
+                        "Peekaboo Binary",
+                        "ACTION REQUIRED",
+                        f"{peekaboo_bin} ({ver_line}) — Missing required 'mcp' subcommand",
+                        "Install Peekaboo 4.3+ which supports MCP mode: brew install steipete/tap/peekaboo"
+                    ))
+                    return peekaboo_bin
+                self.add_check(DoctorCheck("Peekaboo Binary", "PASS", f"{peekaboo_bin} ({ver_line}, MCP supported)"))
                 return peekaboo_bin
             except Exception as e:
                 self.add_check(DoctorCheck("Peekaboo Binary", "ERROR", f"Error executing {peekaboo_bin}: {e}"))

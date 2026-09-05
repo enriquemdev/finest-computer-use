@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.1] - 2026-09-05
+
+### Onboarding Correctness, Evidence Quality & Release Consistency
+
+This patch release hardens the clean-machine onboarding pipeline, refines discovery semantics, eliminates configuration risk, introduces capability probing, and enforces rigorous evidence classification.
+
+#### Fixed & Endured
+- **Canonical MCP Configuration Isolation (`scripts/bootstrap.py`)**:
+  - Targets only the canonical global MCP path (`~/.gemini/config/mcp_config.json`).
+  - Completely preserves any secondary or legacy configuration files (`~/.gemini/antigravity/mcp_config.json`) without destructive overwrite.
+  - Adds atomic writes via sibling `.tmp.<pid>` files, `fsync`, post-write validation, and automatic rollback on malformed input or write error.
+- **Antigravity Discovery Verification (`scripts/bootstrap.py`, `scripts/doctor.py`)**:
+  - Enforces macOS app bundle structural integrity (verifies executable binary inside `Contents/MacOS/`).
+  - Reclassifies config-only state (`~/.gemini` present without confirmed app bundle or CLI) as `ACTION REQUIRED` rather than false positive `PASS`.
+- **Peekaboo Capability Readiness Probes (`scripts/doctor.py`)**:
+  - Added granular capability probes (`probe_peekaboo_mcp`, `probe_peekaboo_permissions`, `probe_peekaboo_observation`, `probe_peekaboo_capabilities`).
+  - Validates that the installed Peekaboo binary supports the required `mcp` subcommand and non-invasive read-only observation.
+- **Evidence Categorization & Honest Semantics (`scripts/smoke_test.py`, `scripts/fresh_mac_acceptance.py`)**:
+  - Clear 4-section smoke test explicitly distinguishing standalone handler smoke from host Antigravity PreToolUse hook dispatch (`REAL ANTIGRAVITY HOOK E2E: NOT EXECUTED`).
+  - Structured acceptance report annotating each check with confidence tiers (`PORTABLE`, `HOST_INTEGRATION`, `FIXTURE`, `ANTIGRAVITY_E2E`, `TRUE_CLEAN_MAC_E2E`).
+  - Retains honest declaration that physical virgin-machine validation is unexecuted (`TRUE CLEAN MAC E2E: NOT EXECUTED`).
+- **Deterministic Release Manifest (`scripts/generate_manifest.py`)**:
+  - Introduced automated manifest generator supporting deterministic SHA-256 generation, cryptographic verification (`--verify`), and cross-surface version reconciliation (`--check-version`).
+
+---
+
 ## [1.1.0] - 2026-09-05
 
 ### Clean-Machine Onboarding & Diagnostic Tooling

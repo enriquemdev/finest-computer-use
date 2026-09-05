@@ -25,6 +25,15 @@ from typing import Dict, Any
 REPO_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SCRIPTS_DIR = os.path.join(REPO_DIR, "scripts")
 
+# Confidence Levels for Evidence Categorization
+CONFIDENCE_LEVELS = {
+    "PORTABLE": "Deterministic logic / syntax / unit validation running across any OS",
+    "HOST_INTEGRATION": "Non-invasive probes executed against the live host environment",
+    "FIXTURE": "End-to-end installation / configuration tested inside isolated temporary directory fixtures",
+    "ANTIGRAVITY_E2E": "Real tool dispatch mediated by host Antigravity PreToolUse hook lifecycle",
+    "TRUE_CLEAN_MAC_E2E": "Complete execution from scratch on an unconfigured physical Mac without existing dev tools"
+}
+
 def run_acceptance() -> Dict[str, Any]:
     report: Dict[str, Any] = {
         "platform": {
@@ -34,7 +43,12 @@ def run_acceptance() -> Dict[str, Any]:
             "arch": platform.machine(),
             "python": sys.version.split()[0]
         },
-        "checks": {}
+        "confidence_levels": CONFIDENCE_LEVELS,
+        "checks": {},
+        "e2e_status": {
+            "antigravity_hook_dispatch": "NOT EXECUTED (Standalone script cannot simulate host Antigravity tool-dispatch hook lifecycle)",
+            "true_clean_mac_e2e": "NOT EXECUTED (Requires physical unconfigured machine without existing development environment)"
+        }
     }
 
     print("=================================================================")
@@ -50,25 +64,29 @@ def run_acceptance() -> Dict[str, Any]:
         except Exception:
             pass
     report["checks"]["macos_15_plus"] = is_supported_mac
-    print(f"1. macOS Platform (>= 15.0): {'PASS' if is_supported_mac else 'FAIL'} ({report['platform']['mac_ver']})")
+    print(f"1. macOS Platform (>= 15.0) [HOST_INTEGRATION]: {'PASS' if is_supported_mac else 'FAIL'} ({report['platform']['mac_ver']})")
 
     # 2. Antigravity
     gemini_home = os.path.expanduser("~/.gemini")
-    agy_found = (
-        os.path.exists("/Applications/Antigravity.app") or
-        os.path.exists(os.path.expanduser("~/Applications/Antigravity.app")) or
-        shutil.which("agy") is not None or
-        os.path.exists(gemini_home)
-    )
-    report["checks"]["antigravity_detected"] = agy_found
-    print(f"2. Antigravity Detected: {'PASS' if agy_found else 'FAIL'}")
+    app_candidates = [
+        "/Applications/Antigravity.app",
+        os.path.expanduser("~/Applications/Antigravity.app")
+    ]
+    app_found = any(os.path.isdir(p) and os.path.exists(os.path.join(p, "Contents", "MacOS")) for p in app_candidates)
+    cli_found = shutil.which("agy") is not None or shutil.which("antigravity") is not None
+    agy_confirmed = app_found or cli_found
+    report["checks"]["antigravity_detected"] = agy_confirmed
+    print(f"2. Antigravity Installation [HOST_INTEGRATION]: {'PASS' if agy_confirmed else 'ACTION REQUIRED'}")
 
     # 3. Peekaboo & TCC
     peekaboo_bin = shutil.which("peekaboo") or "/opt/homebrew/bin/peekaboo"
     peekaboo_installed = os.path.exists(peekaboo_bin) and os.access(peekaboo_bin, os.X_OK)
     tcc_ok = False
+    mcp_mode_ok = False
     if peekaboo_installed:
         try:
+            res_mcp = subprocess.run([peekaboo_bin, "mcp", "--help"], capture_output=True, text=True, timeout=5)
+            mcp_mode_ok = res_mcp.returncode == 0
             res = subprocess.run([peekaboo_bin, "permissions", "--json"], capture_output=True, text=True, timeout=5)
             if res.returncode == 0:
                 perms = json.loads(res.stdout).get("data", {}).get("permissions", [])
@@ -78,9 +96,10 @@ def run_acceptance() -> Dict[str, Any]:
             pass
 
     report["checks"]["peekaboo_installed"] = peekaboo_installed
+    report["checks"]["peekaboo_mcp_support"] = mcp_mode_ok
     report["checks"]["tcc_permissions_granted"] = tcc_ok
-    print(f"3. Peekaboo Binary: {'PASS' if peekaboo_installed else 'ACTION REQUIRED'} ({peekaboo_bin})")
-    print(f"4. macOS TCC Permissions: {'PASS' if tcc_ok else 'ACTION REQUIRED'}")
+    print(f"3. Peekaboo Binary & MCP Mode [HOST_INTEGRATION]: {'PASS' if (peekaboo_installed and mcp_mode_ok) else 'ACTION REQUIRED'} ({peekaboo_bin})")
+    print(f"4. macOS TCC Permissions [HOST_INTEGRATION]: {'PASS' if tcc_ok else 'ACTION REQUIRED'}")
 
     # 4. MCP Configuration
     mcp_file = os.path.expanduser("~/.gemini/config/mcp_config.json")
@@ -93,13 +112,13 @@ def run_acceptance() -> Dict[str, Any]:
         except Exception:
             pass
     report["checks"]["mcp_configured"] = mcp_has_peekaboo
-    print(f"5. Peekaboo MCP Registered: {'PASS' if mcp_has_peekaboo else 'ACTION REQUIRED'}")
+    print(f"5. Peekaboo MCP Registered [HOST_INTEGRATION]: {'PASS' if mcp_has_peekaboo else 'ACTION REQUIRED'}")
 
     # 5. Safety Layer Runtime
     runtime_script = os.path.expanduser("~/.gemini/config/skills/computer-use/scripts/safe_interact.py")
     runtime_installed = os.path.exists(runtime_script)
     report["checks"]["safety_runtime_installed"] = runtime_installed
-    print(f"6. Safety Runtime Files: {'PASS' if runtime_installed else 'ACTION REQUIRED'}")
+    print(f"6. Safety Runtime Files [HOST_INTEGRATION]: {'PASS' if runtime_installed else 'ACTION REQUIRED'}")
 
     # 6. Firewall Healthcheck
     hc_ok = False
@@ -108,7 +127,7 @@ def run_acceptance() -> Dict[str, Any]:
         res_hc = subprocess.run([sys.executable, hc_script], capture_output=True, text=True)
         hc_ok = res_hc.returncode == 0
     report["checks"]["firewall_healthcheck_30_pass"] = hc_ok
-    print(f"7. Firewall Healthcheck (30/30): {'PASS' if hc_ok else 'FAIL'}")
+    print(f"7. Firewall Healthcheck (30/30) [PORTABLE]: {'PASS' if hc_ok else 'FAIL'}")
 
     # 7. Smoke Test
     smoke_ok = False
@@ -117,12 +136,19 @@ def run_acceptance() -> Dict[str, Any]:
         res_smoke = subprocess.run([sys.executable, smoke_script], capture_output=True, text=True)
         smoke_ok = res_smoke.returncode == 0
     report["checks"]["runtime_smoke_test"] = smoke_ok
-    print(f"8. Runtime Smoke Test: {'PASS' if smoke_ok else 'FAIL'}")
+    print(f"8. Runtime Smoke Test [HOST_INTEGRATION]: {'PASS' if smoke_ok else 'FAIL'}")
+
+    # 8. Explicit Non-Claims
+    print("\n9. Antigravity Tool Hook Dispatch [ANTIGRAVITY_E2E]:")
+    print("   STATUS: NOT EXECUTED (Requires running within active Antigravity session)")
+    print("10. Clean Mac E2E Acceptance [TRUE_CLEAN_MAC_E2E]:")
+    print("   STATUS: TRUE CLEAN MAC E2E: NOT EXECUTED (Verified via isolated fixtures)")
 
     all_passed = all(report["checks"].values())
     report["all_passed"] = all_passed
     print("-----------------------------------------------------------------")
-    print(f"  TARGET MAC ACCEPTANCE VERDICT: {'PASS (READY)' if all_passed else 'ACTION REQUIRED'}")
+    verdict = "PASS (READY WITH DOCUMENTED MANUAL STEPS)" if all_passed else "ACTION REQUIRED (Complete prerequisites above)"
+    print(f"  TARGET MAC ACCEPTANCE VERDICT: {verdict}")
     print("=================================================================")
     return report
 

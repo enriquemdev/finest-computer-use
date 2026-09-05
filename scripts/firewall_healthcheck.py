@@ -25,9 +25,15 @@ import shutil
 import time
 from typing import List, Tuple
 
+home_override = None
+for arg in sys.argv[1:]:
+    if arg.startswith("--home="):
+        home_override = arg.split("=", 1)[1]
+
+HOME_DIR = home_override or os.environ.get("GEMINI_HOME") or os.path.expanduser("~")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_SRC = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "src", "finest_computer_use"))
-INSTALLED_DIR = os.path.expanduser("~/.gemini/config/skills/computer-use/scripts")
+INSTALLED_DIR = os.path.join(HOME_DIR, ".gemini/config/skills/computer-use/scripts")
 
 if os.path.exists(os.path.join(REPO_SRC, "safe_interact.py")):
     FIREWALL_DIR = REPO_SRC
@@ -37,7 +43,7 @@ else:
     FIREWALL_DIR = INSTALLED_DIR
 
 SAFE_INTERACT = os.path.join(FIREWALL_DIR, "safe_interact.py")
-HOOKS_JSON = os.path.expanduser("~/.gemini/config/hooks.json")
+HOOKS_JSON = os.path.join(HOME_DIR, ".gemini/config/hooks.json")
 TEMPLATE_HOOKS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "hooks", "hooks.json"))
 
 class HealthCheckRunner:

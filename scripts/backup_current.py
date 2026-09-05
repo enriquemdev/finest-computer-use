@@ -8,18 +8,20 @@ import os
 import shutil
 import time
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-def create_backup(backup_base: str = None) -> Dict[str, Any]:
+def create_backup(home_dir: Optional[str] = None) -> Dict[str, Any]:
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    base_dir = backup_base or os.path.expanduser("~/.gemini/backup")
+    home = home_dir or os.environ.get("GEMINI_HOME") or os.path.expanduser("~")
+    base_dir = os.path.join(home, ".gemini", "backup")
     backup_dir = os.path.join(base_dir, f"computer-use-safety-{timestamp}")
     os.makedirs(backup_dir, exist_ok=True)
 
     items_to_backup = [
-        ("gemini_md", os.path.expanduser("~/.gemini/GEMINI.md")),
-        ("hooks_json", os.path.expanduser("~/.gemini/config/hooks.json")),
-        ("skill_dir", os.path.expanduser("~/.gemini/config/skills/computer-use")),
+        ("gemini_md", os.path.join(home, ".gemini", "GEMINI.md")),
+        ("hooks_json", os.path.join(home, ".gemini", "config", "hooks.json")),
+        ("skill_dir", os.path.join(home, ".gemini", "config", "skills", "computer-use")),
+        ("mcp_config", os.path.join(home, ".gemini", "config", "mcp_config.json"))
     ]
 
     backed_up = {}
@@ -51,7 +53,11 @@ def create_backup(backup_base: str = None) -> Dict[str, Any]:
     return meta
 
 def main():
-    res = create_backup()
+    home_arg = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--home="):
+            home_arg = arg.split("=", 1)[1]
+    res = create_backup(home_dir=home_arg)
     print(f"[OK] Computer Use Safety backup created at: {res['backup_dir']}")
     print(f"     Backed up items: {list(res['backed_up_items'].keys())}")
     sys.exit(0)

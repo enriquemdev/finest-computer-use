@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-install.py — Safe, Idempotent Installer for Computer Use Safety v1.
+install.py — Safe, Idempotent Installer for Computer Use Safety.
 
 Steps:
 1. Back up existing configuration to ~/.gemini/backup/
@@ -26,15 +26,13 @@ SRC_DIR = os.path.join(REPO_DIR, "src", "finest_computer_use")
 POLICY_DIR = os.path.join(REPO_DIR, "policy")
 SCRIPTS_DIR = os.path.join(REPO_DIR, "scripts")
 
-TARGET_SCRIPTS_DIR = os.path.expanduser("~/.gemini/config/skills/computer-use/scripts")
-TARGET_SKILL_MD = os.path.expanduser("~/.gemini/config/skills/computer-use/SKILL.md")
-TARGET_GEMINI_MD = os.path.expanduser("~/.gemini/GEMINI.md")
-TARGET_HOOKS_JSON = os.path.expanduser("~/.gemini/config/hooks.json")
-
-def run_backup() -> Optional[str]:
+def run_backup(home_dir: Optional[str] = None) -> Optional[str]:
     backup_script = os.path.join(SCRIPTS_DIR, "backup_current.py")
     if os.path.exists(backup_script):
-        res = subprocess.run([sys.executable, backup_script], capture_output=True, text=True)
+        cmd = [sys.executable, backup_script]
+        if home_dir:
+            cmd.append(f"--home={home_dir}")
+        res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode == 0:
             for line in res.stdout.splitlines():
                 if "created at:" in line.lower():
@@ -59,18 +57,24 @@ def rollback_from_backup(backup_dir: str):
                 print(f"  Restored {dst}")
     print("[ROLLBACK] Restoration complete.")
 
-def install():
+def install(home_dir: Optional[str] = None) -> int:
+    home = home_dir or os.environ.get("GEMINI_HOME") or os.path.expanduser("~")
+    target_scripts_dir = os.path.join(home, ".gemini/config/skills/computer-use/scripts")
+    target_skill_md = os.path.join(home, ".gemini/config/skills/computer-use/SKILL.md")
+    target_gemini_md = os.path.join(home, ".gemini/GEMINI.md")
+    target_hooks_json = os.path.join(home, ".gemini/config/hooks.json")
+
     print("========================================================")
-    print("INSTALLING FINEST COMPUTER USE SAFETY v1")
+    print("INSTALLING FINEST COMPUTER USE SAFETY")
     print("========================================================")
 
     # 1. Backup
     print("\n1. Backing up existing installation...")
-    backup_dir = run_backup()
+    backup_dir = run_backup(home_dir=home)
     if backup_dir:
         print(f"   Backup created at {backup_dir}")
     else:
-        print("   Warning: Could not create backup before installing.")
+        print("   Notice: No preexisting configuration to backup.")
 
     try:
         # 2. Compile & verify source files
@@ -85,25 +89,24 @@ def install():
 
         # 3. Deploy scripts
         print("\n3. Deploying runtime modules...")
-        os.makedirs(TARGET_SCRIPTS_DIR, exist_ok=True)
+        os.makedirs(target_scripts_dir, exist_ok=True)
         for mod in modules:
-            shutil.copy2(os.path.join(SRC_DIR, mod), os.path.join(TARGET_SCRIPTS_DIR, mod))
-            print(f"   Installed {mod} -> {TARGET_SCRIPTS_DIR}")
+            shutil.copy2(os.path.join(SRC_DIR, mod), os.path.join(target_scripts_dir, mod))
+            print(f"   Installed {mod} -> {target_scripts_dir}")
 
-        # Deploy deploy_firewall.py and firewall_healthcheck.py as utility scripts
         for util in ["deploy_firewall.py", "firewall_healthcheck.py"]:
             src_util = os.path.join(SCRIPTS_DIR, util)
             if os.path.exists(src_util):
-                shutil.copy2(src_util, os.path.join(TARGET_SCRIPTS_DIR, util))
-                print(f"   Installed {util} -> {TARGET_SCRIPTS_DIR}")
+                shutil.copy2(src_util, os.path.join(target_scripts_dir, util))
+                print(f"   Installed {util} -> {target_scripts_dir}")
 
         # 4. Deploy SKILL.md
         print("\n4. Deploying SKILL.md...")
         skill_src = os.path.join(POLICY_DIR, "SKILL.md")
         if os.path.exists(skill_src):
-            os.makedirs(os.path.dirname(TARGET_SKILL_MD), exist_ok=True)
-            shutil.copy2(skill_src, TARGET_SKILL_MD)
-            print(f"   Installed SKILL.md -> {TARGET_SKILL_MD}")
+            os.makedirs(os.path.dirname(target_skill_md), exist_ok=True)
+            shutil.copy2(skill_src, target_skill_md)
+            print(f"   Installed SKILL.md -> {target_skill_md}")
 
         # 5. Merge GEMINI.md policy block
         print("\n5. Merging policy into GEMINI.md...")
@@ -121,8 +124,8 @@ def install():
                 policy_block = f"{start_delim}\n{policy_text.strip()}\n{end_delim}"
 
             existing_text = ""
-            if os.path.exists(TARGET_GEMINI_MD):
-                with open(TARGET_GEMINI_MD, "r", encoding="utf-8") as f:
+            if os.path.exists(target_gemini_md):
+                with open(target_gemini_md, "r", encoding="utf-8") as f:
                     existing_text = f.read()
 
             if start_delim in existing_text and end_delim in existing_text:
@@ -132,22 +135,23 @@ def install():
             else:
                 new_text = (existing_text.rstrip() + "\n\n" + policy_block + "\n").lstrip()
 
-            with open(TARGET_GEMINI_MD, "w", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(target_gemini_md), exist_ok=True)
+            with open(target_gemini_md, "w", encoding="utf-8") as f:
                 f.write(new_text)
-            print(f"   Updated {TARGET_GEMINI_MD} with managed safety policy block.")
+            print(f"   Updated {target_gemini_md} with managed safety policy block.")
 
         # 6. Configure hooks.json
         print("\n6. Configuring hooks.json...")
-        os.makedirs(os.path.dirname(TARGET_HOOKS_JSON), exist_ok=True)
+        os.makedirs(os.path.dirname(target_hooks_json), exist_ok=True)
         hooks_data = {}
-        if os.path.exists(TARGET_HOOKS_JSON):
+        if os.path.exists(target_hooks_json):
             try:
-                with open(TARGET_HOOKS_JSON, "r", encoding="utf-8") as f:
+                with open(target_hooks_json, "r", encoding="utf-8") as f:
                     hooks_data = json.load(f)
             except Exception:
                 hooks_data = {}
 
-        installed_safe_interact = os.path.join(TARGET_SCRIPTS_DIR, "safe_interact.py")
+        installed_safe_interact = os.path.join(target_scripts_dir, "safe_interact.py")
         hooks_data["computer-use-safety"] = {
             "enabled": True,
             "PreToolUse": [
@@ -174,14 +178,17 @@ def install():
             ]
         }
 
-        with open(TARGET_HOOKS_JSON, "w", encoding="utf-8") as f:
+        with open(target_hooks_json, "w", encoding="utf-8") as f:
             json.dump(hooks_data, f, indent=2)
-        print(f"   Registered PreToolUse & PostToolUse in {TARGET_HOOKS_JSON}")
+        print(f"   Registered PreToolUse & PostToolUse in {target_hooks_json}")
 
         # 7. Health Check Verification
         print("\n7. Running healthcheck verification on installed runtime...")
-        hc_script = os.path.join(TARGET_SCRIPTS_DIR, "firewall_healthcheck.py")
-        res = subprocess.run([sys.executable, hc_script], capture_output=True, text=True)
+        hc_script = os.path.join(target_scripts_dir, "firewall_healthcheck.py")
+        hc_cmd = [sys.executable, hc_script, f"--home={home}"]
+        env_hc = os.environ.copy()
+        env_hc["GEMINI_HOME"] = home
+        res = subprocess.run(hc_cmd, env=env_hc, capture_output=True, text=True)
         print(res.stdout)
         if res.returncode != 0:
             print(res.stderr)
@@ -199,7 +206,11 @@ def install():
         return 1
 
 def main():
-    code = install()
+    home_arg = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--home="):
+            home_arg = arg.split("=", 1)[1]
+    code = install(home_dir=home_arg)
     sys.exit(code)
 
 if __name__ == "__main__":

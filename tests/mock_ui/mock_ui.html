@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Non-Invasive Computer Use — Safe Local Mock UI</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 40px;
+      background: #f5f5f7;
+      color: #1d1d1f;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    p.desc { font-size: 13px; color: #86868b; margin-bottom: 24px; }
+    .banner {
+      display: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .banner-recording {
+      background: #ffebe8;
+      color: #d70015;
+      border: 1px solid #ffb3ab;
+    }
+    .composer-area {
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d2d2d7;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    button {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .btn-open { background: #e8e8ed; color: #1d1d1f; }
+    .btn-send { background: #0071e3; color: white; }
+    .btn-voice { background: #ff9500; color: white; }
+    .btn-upload { background: #5856d6; color: white; }
+    .btn-delete { background: #d70015; color: white; }
+    .btn-purchase { background: #34c759; color: white; }
+    .btn-cancel { background: #8e8e93; color: white; grid-column: span 2; }
+    .status-panel {
+      padding: 16px;
+      background: #f5f5f7;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .status-title { font-weight: 600; color: #86868b; margin-bottom: 4px; }
+    #status_label { font-size: 15px; font-weight: 600; color: #1d1d1f; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Computer Use Local Mock Environment</h1>
+    <p class="desc">Deterministic, safe local UI testing harness with ZERO external side-effects.</p>
+
+    <div id="recording_banner" class="banner banner-recording" role="alert">
+      ● AUDIO RECORDING ACTIVE (Voice Note in Progress)
+    </div>
+
+    <div class="composer-area">
+      <input id="composer_input" type="text" placeholder="Type message..." value="Hello from automated test!" aria-label="Message Composer" />
+    </div>
+
+    <div class="button-grid">
+      <button id="btn_open" class="btn-open" aria-label="Open Document">Open</button>
+      <button id="btn_send_text" class="btn-send" aria-label="Send Text Message">Send Text</button>
+      <button id="btn_send_voice" class="btn-voice" aria-label="Record Voice Message">Send Voice</button>
+      <button id="btn_upload_file" class="btn-upload" aria-label="Upload File Attachment">Upload File</button>
+      <button id="btn_delete_item" class="btn-delete" aria-label="Delete Item Permanently">Delete</button>
+      <button id="btn_purchase" class="btn-purchase" aria-label="Complete Purchase">Purchase</button>
+      <button id="btn_cancel" class="btn-cancel" aria-label="Cancel / Stop Recording">Cancel</button>
+    </div>
+
+    <div class="status-panel">
+      <div class="status-title">LOCAL COMPONENT STATE</div>
+      <div id="status_label">Ready (Idle)</div>
+    </div>
+  </div>
+
+  <script>
+    const recordingBanner = document.getElementById('recording_banner');
+    const composerInput = document.getElementById('composer_input');
+    const statusLabel = document.getElementById('status_label');
+
+    window.mockAppState = {
+      status: "Ready (Idle)",
+      recording_active: false,
+      composer_text: composerInput.value,
+      last_action: null
+    };
+
+    function updateState(status, recordingActive, action, composerVal) {
+      window.mockAppState.status = status;
+      window.mockAppState.recording_active = recordingActive;
+      window.mockAppState.last_action = action;
+      if (composerVal !== undefined) {
+        window.mockAppState.composer_text = composerVal;
+        composerInput.value = composerVal;
+      }
+      statusLabel.textContent = status;
+      recordingBanner.style.display = recordingActive ? 'block' : 'none';
+    }
+
+    document.getElementById('btn_open').onclick = () => {
+      updateState("Document Opened", false, "open");
+    };
+
+    document.getElementById('btn_send_text').onclick = () => {
+      updateState("Text Message Sent", false, "send_text", "");
+    };
+
+    document.getElementById('btn_send_voice').onclick = () => {
+      updateState("Recording Active (Unexpected Voice Mode)", true, "send_voice");
+    };
+
+    document.getElementById('btn_upload_file').onclick = () => {
+      updateState("File Attachment Selected", false, "upload_file");
+    };
+
+    document.getElementById('btn_delete_item').onclick = () => {
+      updateState("Item Permanently Deleted", false, "delete");
+    };
+
+    document.getElementById('btn_purchase').onclick = () => {
+      updateState("Purchase Completed ($9.99)", false, "purchase");
+    };
+
+    document.getElementById('btn_cancel').onclick = () => {
+      updateState("Operation Cancelled / Safe Baseline Restored", false, "cancel");
+    };
+
+    composerInput.oninput = (e) => {
+      window.mockAppState.composer_text = e.target.value;
+    };
+  </script>
+</body>
+</html>

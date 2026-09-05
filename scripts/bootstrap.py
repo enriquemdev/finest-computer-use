@@ -35,10 +35,11 @@ sys.path.insert(0, SCRIPTS_DIR)
 from doctor import SystemDoctor
 
 class BootstrapOrchestrator:
-    def __init__(self, home_dir: Optional[str] = None, dry_run: bool = False, skip_mcp: bool = False, allow_non_darwin: bool = False):
+    def __init__(self, home_dir: Optional[str] = None, dry_run: bool = False, skip_mcp: bool = False, skip_doctor: bool = False, allow_non_darwin: bool = False):
         self.home = home_dir or os.environ.get("GEMINI_HOME") or os.path.expanduser("~")
         self.dry_run = dry_run
         self.skip_mcp = skip_mcp
+        self.skip_doctor = skip_doctor or os.environ.get("FINEST_SKIP_DOCTOR") == "1"
         self.allow_non_darwin = allow_non_darwin or os.environ.get("FINEST_ALLOW_NON_DARWIN") == "1"
         self.gemini_dir = os.path.join(self.home, ".gemini")
         self.config_dir = os.path.join(self.gemini_dir, "config")
@@ -270,6 +271,14 @@ class BootstrapOrchestrator:
             print("=================================================================\n")
             return 0
 
+        if self.skip_doctor:
+            print("\n7. System Doctor Verification...")
+            print("  [SKIP] Post-install doctor check skipped (--skip-doctor).")
+            print("\n=================================================================")
+            print("   BOOTSTRAP CONFIGURATION COMPLETE                              ")
+            print("=================================================================\n")
+            return 0
+
         print("\n7. Running Post-Installation System Doctor...")
         doc = SystemDoctor(home_dir=self.home)
         exit_code = doc.run_all()
@@ -295,6 +304,7 @@ def main():
     check_mode = "--check" in sys.argv
     json_mode = "--json" in sys.argv
     skip_mcp = "--skip-mcp" in sys.argv
+    skip_doctor = "--skip-doctor" in sys.argv or os.environ.get("FINEST_SKIP_DOCTOR") == "1"
     allow_non_darwin = "--allow-non-darwin" in sys.argv or os.environ.get("FINEST_ALLOW_NON_DARWIN") == "1"
     home_arg = None
     for arg in sys.argv[1:]:
@@ -308,7 +318,7 @@ def main():
             doc.report(json_output=json_mode)
         sys.exit(code)
 
-    orchestrator = BootstrapOrchestrator(home_dir=home_arg, dry_run=dry_run, skip_mcp=skip_mcp, allow_non_darwin=allow_non_darwin)
+    orchestrator = BootstrapOrchestrator(home_dir=home_arg, dry_run=dry_run, skip_mcp=skip_mcp, skip_doctor=skip_doctor, allow_non_darwin=allow_non_darwin)
     code = orchestrator.run_bootstrap()
     sys.exit(code)
 

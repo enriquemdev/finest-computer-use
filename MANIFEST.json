@@ -26,7 +26,7 @@
     "policy/SKILL.md": "76ff14f74fe7ee27b2c9c3a8388c392cb6ad4891dae7c92daf308761a864ac29",
     "pyproject.toml": "8d87920b9183d432937e93cf377a9c5e2b321fcad23ce7d632fd2bade475f578",
     "scripts/backup_current.py": "1c64ac032045549e45bdeab3f30e9a083e03e365d491c7357e207e222217f640",
-    "scripts/bootstrap.py": "a26a97d308df210d098e9c686dbc0c71f4ea8949a2575c17fa07fbf4d3c49251",
+    "scripts/bootstrap.py": "2a6fc494dda663213552acb4eaa9142cdc8a26f7ef5ad2fc6cab0697679d1d59",
     "scripts/deploy_firewall.py": "6781af03e5cf924dff191b03d38b5813a6a5096dbd5186a27eb220e2fe57054f",
     "scripts/doctor.py": "7f6f33e6fa7319e60df6ed88414c050b8fa0de5d175d0f25ee08e85d91cc7995",
     "scripts/firewall_healthcheck.py": "705060342541a2588b659d101452de98ab6529d64180d6fabe8438a6fef7621b",
@@ -40,6 +40,6 @@
     "src/finest_computer_use/safe_interact.py": "53481955357c92d9a7a449e7c0b4bcbf77a82ae08fbecf0a8316e453be1d03a7",
     "tests/mock_ui/mock_ui.html": "38f692d2d1ad481af8dffdcf73861e989fc6d01e87b13da6d906b0009c5ca03f",
     "tests/run_firewall_regression.py": "9c3fd174c78738e781c501b1af0570b903024b4f530a87e3a90bab92a52aee05",
-    "tests/test_fresh_install.py": "812ad11add1e122317d1c5a5f0ddff731b2d99a258c3c69ce3c9ae9d2f2a03a7"
+    "tests/test_fresh_install.py": "59d387e8673d434ba410b97eed64c3928d03fd1288cf90f3ab52234f7b016b27"
   }
 }

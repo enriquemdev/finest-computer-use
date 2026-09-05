@@ -48,6 +48,7 @@ class FreshInstallTestSuite:
         env = os.environ.copy()
         env["HOME"] = fixture_home
         env["FINEST_ALLOW_NON_DARWIN"] = "1"
+        env["FINEST_SKIP_DOCTOR"] = "1"
         return env
 
     def test_dry_run_zero_mutation(self):

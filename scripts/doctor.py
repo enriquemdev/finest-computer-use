@@ -20,6 +20,13 @@ import platform
 import subprocess
 from typing import Dict, Any, List, Optional, Tuple
 
+REPO_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC_DIR = os.path.join(REPO_DIR, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+from finest_computer_use.discovery import discover_antigravity as unified_discover_ag, is_valid_app_bundle
+
 class DoctorCheck:
     def __init__(self, name: str, status: str, message: str = "", action: str = ""):
         self.name = name
@@ -99,19 +106,7 @@ class SystemDoctor:
 
     def _is_valid_app_bundle(self, app_path: str) -> bool:
         """Verify that an app bundle has the expected macOS structure with an executable binary."""
-        if not (os.path.isdir(app_path) and app_path.endswith(".app")):
-            return False
-        macos_dir = os.path.join(app_path, "Contents", "MacOS")
-        if not os.path.isdir(macos_dir):
-            return False
-        try:
-            for entry in os.listdir(macos_dir):
-                entry_path = os.path.join(macos_dir, entry)
-                if os.path.isfile(entry_path) and os.access(entry_path, os.X_OK):
-                    return True
-        except OSError:
-            return False
-        return False
+        return is_valid_app_bundle(app_path)
 
     def probe_peekaboo_mcp(self, peekaboo_bin: Optional[str] = None) -> bool:
         """Probe whether the peekaboo binary supports the required 'mcp' subcommand."""
@@ -174,37 +169,14 @@ class SystemDoctor:
         }
 
     def check_antigravity(self):
-        gemini_dir = os.path.join(self.home, ".gemini")
-        is_isolated = (self.home != os.path.expanduser("~")) or (os.environ.get("FINEST_ISOLATE_APP_SEARCH") == "1")
-
-        app_candidates = []
-        if os.environ.get("ANTIGRAVITY_APP_PATH"):
-            app_candidates.append(os.environ["ANTIGRAVITY_APP_PATH"])
-        elif not is_isolated:
-            app_candidates.append("/Applications/Antigravity.app")
-        app_candidates.append(os.path.join(self.home, "Applications", "Antigravity.app"))
-
-        valid_app = next((p for p in app_candidates if os.path.exists(p) and self._is_valid_app_bundle(p)), None)
-
-        if is_isolated:
-            cli_found = shutil.which("agy", path=os.path.join(self.home, "bin")) or shutil.which("antigravity", path=os.path.join(self.home, "bin"))
-        else:
-            cli_found = shutil.which("agy") or shutil.which("antigravity")
-
-        if valid_app or cli_found:
-            details = []
-            if valid_app:
-                details.append(f"Application bundle ({valid_app})")
-            if cli_found:
-                details.append(f"CLI ({cli_found})")
-            if os.path.exists(gemini_dir):
-                details.append(f"Config dir ({gemini_dir})")
-            self.add_check(DoctorCheck("Antigravity Discovery", "PASS", ", ".join(details)))
-        elif os.path.exists(gemini_dir):
+        discovery = unified_discover_ag(self.home)
+        if discovery.installed_confirmed:
+            self.add_check(DoctorCheck("Antigravity Discovery", "PASS", ", ".join(discovery.details)))
+        elif discovery.config_found:
             self.add_check(DoctorCheck(
                 "Antigravity Discovery",
                 "ACTION REQUIRED",
-                f"Config directory exists ({gemini_dir}), but Antigravity application or CLI is NOT confirmed",
+                discovery.status_summary,
                 "Ensure Antigravity.app is installed or 'agy' CLI is in PATH."
             ))
         else:
@@ -300,38 +272,85 @@ class SystemDoctor:
             self.add_check(DoctorCheck("macOS TCC Permissions", "ACTION REQUIRED", f"Permission check failed: {e}"))
 
     def check_mcp_config(self, peekaboo_bin: Optional[str]):
-        mcp_paths = [
-            os.path.join(self.home, ".gemini/config/mcp_config.json"),
-            os.path.join(self.home, ".gemini/antigravity/mcp_config.json")
-        ]
-        found_config = None
-        has_peekaboo = False
-        target_bin = None
+        canonical_path = os.path.join(self.home, ".gemini/config/mcp_config.json")
+        legacy_path = os.path.join(self.home, ".gemini/antigravity/mcp_config.json")
 
-        for p in mcp_paths:
-            if os.path.exists(p):
-                found_config = p
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    servers = data.get("mcpServers", {})
-                    if "peekaboo" in servers:
-                        has_peekaboo = True
-                        target_bin = servers["peekaboo"].get("command")
-                        break
-                except Exception:
-                    pass
+        canonical_exists = os.path.exists(canonical_path)
+        legacy_exists = os.path.exists(legacy_path)
 
-        if has_peekaboo:
-            self.add_check(DoctorCheck("Peekaboo MCP Registration", "PASS", f"Registered in {os.path.basename(found_config)} (command: {target_bin})"))
-        else:
-            hint = f"Run 'python3 scripts/bootstrap.py' to automatically register Peekaboo MCP in {os.path.basename(mcp_paths[0])}."
+        is_symlink_equivalent = False
+        if canonical_exists and legacy_exists:
+            try:
+                is_symlink_equivalent = os.path.samefile(canonical_path, legacy_path)
+            except OSError:
+                is_symlink_equivalent = False
+
+        legacy_has_peekaboo = False
+        if legacy_exists and not is_symlink_equivalent:
+            try:
+                with open(legacy_path, "r", encoding="utf-8") as f:
+                    leg_data = json.load(f)
+                legacy_has_peekaboo = "peekaboo" in leg_data.get("mcpServers", {})
+            except Exception:
+                pass
+
+        if not canonical_exists:
+            if legacy_has_peekaboo:
+                self.add_check(DoctorCheck(
+                    "Peekaboo MCP Registration",
+                    "ACTION REQUIRED",
+                    "Peekaboo found only in legacy MCP configuration; canonical Antigravity MCP configuration is not ready.",
+                    "Run 'python3 scripts/bootstrap.py' to configure canonical ~/.gemini/config/mcp_config.json."
+                ))
+            else:
+                self.add_check(DoctorCheck(
+                    "Peekaboo MCP Registration",
+                    "ACTION REQUIRED",
+                    "Peekaboo MCP not configured in ~/.gemini/config/mcp_config.json",
+                    "Run 'python3 scripts/bootstrap.py' to automatically register Peekaboo MCP."
+                ))
+            return
+
+        try:
+            with open(canonical_path, "r", encoding="utf-8") as f:
+                canonical_data = json.load(f)
+        except Exception as e:
             self.add_check(DoctorCheck(
                 "Peekaboo MCP Registration",
-                "ACTION REQUIRED",
-                f"Peekaboo MCP not configured in ~/.gemini/config/mcp_config.json",
-                hint
+                "ERROR",
+                f"Canonical MCP configuration ({canonical_path}) is malformed JSON: {e}",
+                "Repair ~/.gemini/config/mcp_config.json or re-run bootstrap."
             ))
+            return
+
+        canonical_servers = canonical_data.get("mcpServers", {})
+        if "peekaboo" in canonical_servers:
+            target_bin = canonical_servers["peekaboo"].get("command")
+            legacy_info = ""
+            if is_symlink_equivalent:
+                legacy_info = " (legacy path is active symlink)"
+            elif legacy_exists:
+                legacy_info = " (independent legacy file detected)"
+            self.add_check(DoctorCheck(
+                "Peekaboo MCP Registration",
+                "PASS",
+                f"Registered in canonical mcp_config.json (command: {target_bin}){legacy_info}"
+            ))
+        else:
+            if legacy_has_peekaboo:
+                self.add_check(DoctorCheck(
+                    "Peekaboo MCP Registration",
+                    "ACTION REQUIRED",
+                    "Peekaboo found only in legacy MCP configuration; canonical Antigravity MCP configuration is not ready.",
+                    "Run 'python3 scripts/bootstrap.py' to register Peekaboo MCP in canonical config."
+                ))
+            else:
+                self.add_check(DoctorCheck(
+                    "Peekaboo MCP Registration",
+                    "ACTION REQUIRED",
+                    "Peekaboo MCP not configured in ~/.gemini/config/mcp_config.json",
+                    "Run 'python3 scripts/bootstrap.py' to register Peekaboo MCP."
+                ))
 
     def check_safety_runtime(self) -> bool:
         scripts_dir = os.path.join(self.home, ".gemini/config/skills/computer-use/scripts")

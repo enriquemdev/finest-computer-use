@@ -23,6 +23,12 @@ import shutil
 from typing import Dict, Any
 
 REPO_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC_DIR = os.path.join(REPO_DIR, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+from finest_computer_use.discovery import discover_antigravity
+
 SCRIPTS_DIR = os.path.join(REPO_DIR, "scripts")
 
 # Confidence Levels for Evidence Categorization
@@ -67,16 +73,11 @@ def run_acceptance() -> Dict[str, Any]:
     print(f"1. macOS Platform (>= 15.0) [HOST_INTEGRATION]: {'PASS' if is_supported_mac else 'FAIL'} ({report['platform']['mac_ver']})")
 
     # 2. Antigravity
-    gemini_home = os.path.expanduser("~/.gemini")
-    app_candidates = [
-        "/Applications/Antigravity.app",
-        os.path.expanduser("~/Applications/Antigravity.app")
-    ]
-    app_found = any(os.path.isdir(p) and os.path.exists(os.path.join(p, "Contents", "MacOS")) for p in app_candidates)
-    cli_found = shutil.which("agy") is not None or shutil.which("antigravity") is not None
-    agy_confirmed = app_found or cli_found
+    ag_discovery = discover_antigravity()
+    agy_confirmed = ag_discovery.installed_confirmed
     report["checks"]["antigravity_detected"] = agy_confirmed
-    print(f"2. Antigravity Installation [HOST_INTEGRATION]: {'PASS' if agy_confirmed else 'ACTION REQUIRED'}")
+    agy_detail = f" ({ag_discovery.app_path or ag_discovery.cli_path})" if agy_confirmed else ""
+    print(f"2. Antigravity Installation [HOST_INTEGRATION]: {'PASS' if agy_confirmed else 'ACTION REQUIRED'}{agy_detail}")
 
     # 3. Peekaboo & TCC
     peekaboo_bin = shutil.which("peekaboo") or "/opt/homebrew/bin/peekaboo"
@@ -144,20 +145,25 @@ def run_acceptance() -> Dict[str, Any]:
     print("10. Clean Mac E2E Acceptance [TRUE_CLEAN_MAC_E2E]:")
     print("   STATUS: TRUE CLEAN MAC E2E: NOT EXECUTED (Verified via isolated fixtures)")
 
-    all_passed = all(report["checks"].values())
-    report["all_passed"] = all_passed
+    checks_passed = all(report["checks"].values())
+    report["all_passed"] = checks_passed
     print("-----------------------------------------------------------------")
-    verdict = "PASS (READY WITH DOCUMENTED MANUAL STEPS)" if all_passed else "ACTION REQUIRED (Complete prerequisites above)"
-    print(f"  TARGET MAC ACCEPTANCE VERDICT: {verdict}")
+    if checks_passed:
+        print("  AUTOMATED / HOST ACCEPTANCE: PASS (8/8 automated checks passed)")
+        print("  REAL ANTIGRAVITY HOOK E2E: NOT EXECUTED")
+        print("  TRUE CLEAN MAC E2E: NOT EXECUTED")
+        print("  TARGET MAC ACCEPTANCE VERDICT: READY WITH DOCUMENTED MANUAL EVIDENCE PENDING")
+    else:
+        print("  TARGET MAC ACCEPTANCE VERDICT: ACTION REQUIRED (Complete prerequisites above)")
     print("=================================================================")
     return report
 
 def main():
     json_mode = "--json" in sys.argv
-    rep = run_acceptance()
+    report = run_acceptance()
     if json_mode:
-        print(json.dumps(rep, indent=2))
-    sys.exit(0 if rep["all_passed"] else 1)
+        print(json.dumps(report, indent=2))
+    sys.exit(0 if report["all_passed"] else 1)
 
 if __name__ == "__main__":
     main()

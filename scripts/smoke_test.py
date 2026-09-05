@@ -139,7 +139,9 @@ def run_smoke():
     print("            but cannot simulate host Antigravity tool-dispatch hook lifecycle)")
 
     print("\n-----------------------------------------------------------------")
-    print("  SMOKE TEST PASSED: ALL RUNTIME GUARDS FUNCTIONING AS INTENDED   ")
+    print("  AUTOMATED SMOKE CHECKS: 3/3 PASS")
+    print("  REAL ANTIGRAVITY HOOK E2E: NOT EXECUTED")
+    print("  OVERALL STATUS: PASS WITH MANUAL E2E PENDING")
     print("=================================================================")
     sys.exit(0)
 

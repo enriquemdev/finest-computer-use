@@ -1,7 +1,7 @@
-# Finest Computer Use Safety (v1.1.1)
+# Finest Computer Use Safety (v1.1.2)
 
 [![CI](https://github.com/enriquemdev/finest-computer-use/actions/workflows/ci.yml/badge.svg)](https://github.com/enriquemdev/finest-computer-use/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/enriquemdev/finest-computer-use/releases/tag/v1.1.1)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](https://github.com/enriquemdev/finest-computer-use/releases/tag/v1.1.2)
 [![Python](https://img.shields.io/badge/python-3.9%2B-brightgreen.svg)](https://www.python.org/)
 [![macOS](https://img.shields.io/badge/macOS-15.0%2B%20(Sequoia)-orange.svg)](https://support.apple.com/macos)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -147,14 +147,14 @@ finest-computer-use/
 │   │   └── mock_ui.html
 │   ├── test_fresh_install.py       # Clean-machine onboarding lifecycle test suite (31 tests)
 │   └── run_firewall_regression.py  # 35-test comprehensive regression runner
-├── CHANGELOG.md                    # Architecture release notes (v1.1.1)
+├── CHANGELOG.md                    # Architecture release notes (v1.1.2)
 ├── CONTRIBUTING.md                 # Contribution guidelines and staging requirements
 ├── LICENSE                         # MIT License
 ├── MANIFEST.json                   # Cryptographic manifest of release artifacts
 ├── pyproject.toml                  # Python package metadata (Python 3.9+)
 ├── README.md                       # This documentation
 ├── SECURITY.md                     # Security policy, vulnerability disclosures
-└── VERSION                         # 1.1.1
+└── VERSION                         # 1.1.2
 ```
 
 ---

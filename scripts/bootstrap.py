@@ -30,9 +30,13 @@ from typing import Optional, Dict, Any, Tuple
 
 REPO_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SCRIPTS_DIR = os.path.join(REPO_DIR, "scripts")
+SRC_DIR = os.path.join(REPO_DIR, "src")
 sys.path.insert(0, SCRIPTS_DIR)
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
 from doctor import SystemDoctor
+from finest_computer_use.discovery import discover_antigravity as unified_discover_ag, is_valid_app_bundle
 
 class BootstrapOrchestrator:
     def __init__(self, home_dir: Optional[str] = None, dry_run: bool = False, skip_mcp: bool = False, skip_doctor: bool = False, allow_non_darwin: bool = False):
@@ -88,58 +92,14 @@ class BootstrapOrchestrator:
 
     def _is_valid_app_bundle(self, app_path: str) -> bool:
         """Verify that an app bundle has the expected macOS structure with an executable."""
-        if not (os.path.isdir(app_path) and app_path.endswith(".app")):
-            return False
-        macos_dir = os.path.join(app_path, "Contents", "MacOS")
-        if not os.path.isdir(macos_dir):
-            return False
-        try:
-            for item in os.listdir(macos_dir):
-                full_item = os.path.join(macos_dir, item)
-                if os.path.isfile(full_item) and os.access(full_item, os.X_OK):
-                    return True
-        except Exception:
-            return False
-        return False
+        return is_valid_app_bundle(app_path)
 
     def discover_antigravity(self) -> Tuple[bool, str]:
-        app_candidates = []
-        is_isolated = (self.home != os.path.expanduser("~")) or (os.environ.get("FINEST_ISOLATE_APP_SEARCH") == "1")
-        if os.environ.get("ANTIGRAVITY_APP_PATH"):
-            app_candidates.append(os.environ["ANTIGRAVITY_APP_PATH"])
-        elif is_isolated:
-            app_candidates.append(os.path.join(self.home, "Applications", "Antigravity.app"))
-        else:
-            app_candidates.extend([
-                os.path.join(self.home, "Applications", "Antigravity.app"),
-                "/Applications/Antigravity.app"
-            ])
+        discovery = unified_discover_ag(self.home, allow_simulated=(self.allow_non_darwin or self.dry_run))
+        if discovery.installed_confirmed:
+            return True, discovery.status_summary
 
-        app_found = any(self._is_valid_app_bundle(p) for p in app_candidates if os.path.exists(p))
-
-        cli_found = None
-        if is_isolated:
-            fixture_bin = os.path.join(self.home, "bin")
-            for c in ["agy", "antigravity"]:
-                p = os.path.join(fixture_bin, c)
-                if os.path.exists(p) and os.access(p, os.X_OK):
-                    cli_found = p
-                    break
-        else:
-            cli_found = shutil.which("agy") or shutil.which("antigravity")
-
-        config_found = os.path.exists(self.gemini_dir)
-
-        if app_found or cli_found:
-            details = []
-            if app_found:
-                valid_apps = [p for p in app_candidates if os.path.exists(p) and self._is_valid_app_bundle(p)]
-                details.append(f"Application bundle ({valid_apps[0]})")
-            if cli_found:
-                details.append(f"CLI ({cli_found})")
-            return True, f"Antigravity installation confirmed ({', '.join(details)})"
-
-        if config_found:
+        if discovery.config_found:
             if self.allow_non_darwin or self.dry_run:
                 return True, "Antigravity configuration present (simulated in portable/dry-run mode)"
             return False, "Antigravity configuration directory exists (~/.gemini), but application bundle or CLI was not confirmed. Please install Antigravity."
@@ -204,8 +164,39 @@ class BootstrapOrchestrator:
             "args": ["mcp", "--allow-foreground"]
         }
 
-        if existing_peekaboo == desired_entry:
-            return True, "Peekaboo MCP already configured identically."
+        # Case A: No existing peekaboo -> add Finest-managed entry
+        if existing_peekaboo is None:
+            entry_to_write = dict(desired_entry)
+            entry_to_write["_finest_managed"] = True
+        else:
+            # Case B: Check if identical entry (ignoring management metadata)
+            stripped_existing = {k: v for k, v in existing_peekaboo.items() if k not in ("_finest_managed", "managedBy")}
+            if stripped_existing == desired_entry:
+                return True, "Peekaboo MCP already configured identically."
+
+            # Case C/F: Check if provably legacy Finest-managed
+            is_legacy_finest = existing_peekaboo.get("_finest_managed") is True or existing_peekaboo.get("managedBy") == "finest"
+            if is_legacy_finest:
+                entry_to_write = dict(desired_entry)
+                entry_to_write["_finest_managed"] = True
+            else:
+                # Case D & E: Custom user entry differs -> PRESERVE and emit ACTION REQUIRED
+                diff_details = []
+                curr_cmd = existing_peekaboo.get("command")
+                curr_args = existing_peekaboo.get("args")
+                if curr_cmd != desired_entry["command"]:
+                    diff_details.append(f"command='{curr_cmd}' vs expected '{desired_entry['command']}'")
+                if curr_args != desired_entry["args"]:
+                    diff_details.append(f"args={curr_args} vs expected {desired_entry['args']}")
+                extra_keys = [k for k in existing_peekaboo.keys() if k not in ("command", "args")]
+                if extra_keys:
+                    diff_details.append(f"custom keys={extra_keys}")
+
+                return False, (
+                    f"ACTION REQUIRED: Existing Peekaboo MCP configuration differs from Finest-managed configuration.\n"
+                    f"  Detected: {', '.join(diff_details)}\n"
+                    f"  Existing configuration was preserved intact in {target_file}."
+                )
 
         if self.dry_run:
             return True, f"[DRY-RUN] Would update {target_file} to register Peekaboo MCP (command: {peekaboo_bin})."
@@ -219,7 +210,7 @@ class BootstrapOrchestrator:
             except Exception as e:
                 return False, f"Failed to create backup of {target_file}: {e}"
 
-        servers["peekaboo"] = desired_entry
+        servers["peekaboo"] = entry_to_write
 
         # Atomic replacement with fsync and post-write validation
         tmp_target = f"{target_file}.tmp.{os.getpid()}"

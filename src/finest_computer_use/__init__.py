@@ -34,7 +34,13 @@ from .safe_interact import (
     process_post_tool_payload
 )
 
-__version__ = "1.0.0"
+from .discovery import (
+    discover_antigravity,
+    is_valid_app_bundle,
+    AntigravityDiscovery
+)
+
+__version__ = "1.1.2"
 
 __all__ = [
     "EffectLevel",
@@ -55,5 +61,8 @@ __all__ = [
     "save_firewall_state",
     "process_hook_payload",
     "process_post_tool_payload",
+    "discover_antigravity",
+    "is_valid_app_bundle",
+    "AntigravityDiscovery",
     "__version__"
 ]

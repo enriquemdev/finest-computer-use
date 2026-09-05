@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.2] - 2026-09-05
+
+### MCP Conflict Protection, Unified Discovery & Truthful Evidence Semantics
+
+This patch release closes four concrete onboarding and evidence gaps identified in v1.1.1 without altering the frozen Computer Use Safety core.
+
+#### Fixed & Endured
+- **Existing Custom Peekaboo MCP Conflict Protection (`scripts/bootstrap.py`)**:
+  - Distinguishes unmanaged or custom Peekaboo configurations (differing binary paths, customized arguments, environment variables, or other properties) from default Finest installations.
+  - Never mutates or overwrites user-customized configurations; emits `ACTION REQUIRED` and leaves the existing file completely untouched (Cases A–F validated).
+  - Explicitly marks managed entries with `_finest_managed: True` while migrating legacy Finest configurations safely.
+- **Canonical-vs-Legacy MCP Doctor Semantics (`scripts/doctor.py`)**:
+  - Recognizes `~/.gemini/config/mcp_config.json` as the sole authoritative canonical configuration.
+  - Correctly reports `ACTION REQUIRED` when Peekaboo is registered only in legacy `~/.gemini/antigravity/mcp_config.json`.
+  - Transparently identifies symlink equivalence via inode verification (`os.path.samefile`).
+  - Reports `ERROR` / `ACTION REQUIRED` when the canonical file is malformed, even if the legacy file is valid.
+- **Unified Antigravity Discovery Logic (`src/finest_computer_use/discovery.py`)**:
+  - Implemented single-source reusable discovery module (`AntigravityDiscovery`, `is_valid_app_bundle`, `discover_antigravity`).
+  - Unified detection across `scripts/bootstrap.py`, `scripts/doctor.py`, and `scripts/fresh_mac_acceptance.py`.
+  - Rejects empty app directories and ensures valid macOS executable bundles (`Contents/MacOS/<binary>`).
+- **Truthful Smoke & Acceptance Status Reporting (`scripts/smoke_test.py`, `scripts/fresh_mac_acceptance.py`)**:
+  - Eliminated misleading "4/4 PASS" and "ALL RUNTIME GUARDS FUNCTIONING" claims from standalone executions.
+  - Accurately reports `AUTOMATED SMOKE CHECKS: 3/3 PASS`, `REAL ANTIGRAVITY HOOK E2E: NOT EXECUTED`, and `OVERALL STATUS: PASS WITH MANUAL E2E PENDING`.
+  - Acceptance report explicitly logs `TARGET MAC ACCEPTANCE VERDICT: READY WITH DOCUMENTED MANUAL EVIDENCE PENDING`.
+
+---
+
 ## [1.1.1] - 2026-09-05
 
 ### Onboarding Correctness, Evidence Quality & Release Consistency

@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m py_compile src/finest_computer_use/*.py
           python -m py_compile scripts/*.py
-          python -m py_compile tests/run_firewall_regression.py
+          python -m py_compile tests/*.py
 
       - name: Run Intent/Effect Firewall Regression Suite (35 tests)
         run: |
@@ -37,3 +37,11 @@ jobs:
       - name: Run Firewall Healthcheck (30 checks)
         run: |
           python scripts/firewall_healthcheck.py
+
+      - name: Run Clean-Machine Lifecycle & Onboarding Tests (31 tests)
+        run: |
+          python tests/test_fresh_install.py
+
+      - name: Run System Doctor CLI Check
+        run: |
+          python scripts/doctor.py --json || true

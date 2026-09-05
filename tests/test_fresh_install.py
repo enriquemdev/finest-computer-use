@@ -57,7 +57,7 @@ class FreshInstallTestSuite:
             env = self._get_env(fixture_home)
             # Run dry-run
             res = subprocess.run([sys.executable, BOOTSTRAP_SCRIPT, "--dry-run", f"--home={fixture_home}"], env=env, capture_output=True, text=True)
-            self.record("Dry-run execution exit code 0", res.returncode == 0, res.stderr)
+            self.record("Dry-run execution exit code 0", res.returncode == 0, res.stderr or res.stdout)
 
             # Confirm .gemini was not created or modified with real files
             gemini_dir = os.path.join(fixture_home, ".gemini")

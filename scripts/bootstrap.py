@@ -95,6 +95,8 @@ class BootstrapOrchestrator:
         config_found = os.path.exists(self.gemini_dir)
 
         if not (app_found or cli_found or config_found):
+            if self.allow_non_darwin or self.dry_run:
+                return True, "Antigravity simulated (portable/dry-run mode)"
             msg = (
                 "Antigravity application or configuration not found.\n"
                 "  Please install Antigravity before proceeding:\n"
@@ -112,6 +114,8 @@ class BootstrapOrchestrator:
         ]
         peekaboo_bin = next((c for c in candidates if c and os.path.exists(c) and os.access(c, os.X_OK)), None)
         if not peekaboo_bin:
+            if self.allow_non_darwin or self.dry_run:
+                return "/opt/homebrew/bin/peekaboo", "Peekaboo placeholder (portable/dry-run mode)"
             has_brew = shutil.which("brew") is not None
             install_cmd = "brew install steipete/tap/peekaboo" if has_brew else "https://github.com/openclaw/Peekaboo#installation"
             msg = (

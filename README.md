@@ -1,10 +1,12 @@
-# Finest Computer Use Safety (v1.0.0)
+# Finest Computer Use Safety (v1.1.0)
 
 [![CI](https://github.com/enriquemdev/finest-computer-use/actions/workflows/ci.yml/badge.svg)](https://github.com/enriquemdev/finest-computer-use/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/enriquemdev/finest-computer-use/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/enriquemdev/finest-computer-use/releases/tag/v1.1.0)
 [![Python](https://img.shields.io/badge/python-3.9%2B-brightgreen.svg)](https://www.python.org/)
+[![macOS](https://img.shields.io/badge/macOS-15.0%2B%20(Sequoia)-orange.svg)](https://support.apple.com/macos)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-35%2F35%20PASS-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/regression%20tests-35%2F35%20PASS-success.svg)](tests/)
+[![Clean Install Tests](https://img.shields.io/badge/clean%20install%20tests-31%2F31%20PASS-success.svg)](tests/test_fresh_install.py)
 [![Healthcheck](https://img.shields.io/badge/healthcheck-30%2F30%20PASS-success.svg)](scripts/)
 
 > **Hardened, non-invasive macOS Computer Use Safety Architecture for Agentic AI.**
@@ -113,6 +115,8 @@ finest-computer-use/
 │   ├── non-invasive-computer-use.md# Tier 0-4 execution policy & background rules
 │   ├── degraded-mode.md            # Anti-brick and anti-fail-open failure semantics
 │   ├── installation.md             # Installation, upgrade, and rollback manual
+│   ├── troubleshooting.md          # Concrete diagnostics for 7 major failure modes
+│   ├── fresh-mac-acceptance.md     # Clean-machine acceptance test harness & checklist
 │   ├── recovery.md                 # UI desynchronization & recovery mode protocol
 │   ├── testing.md                  # Test suites, mocks, and E2E verification
 │   └── limitations.md              # Boundary conditions and platform scope
@@ -123,6 +127,10 @@ finest-computer-use/
 │   ├── GEMINI.md                   # Managed system instructions block
 │   └── SKILL.md                    # Antigravity computer-use skill definition
 ├── scripts/
+│   ├── bootstrap.py                # One-command clean-machine onboarding orchestrator
+│   ├── doctor.py                   # Multi-tier environment and diagnostic inspector
+│   ├── smoke_test.py               # Safe, non-invasive runtime smoke verification
+│   ├── fresh_mac_acceptance.py     # Clean-Mac acceptance test & audit evidence collector
 │   ├── install.py                  # Idempotent installer with atomic backup & rollback
 │   ├── uninstall.py                # Safe uninstaller restoring previous state
 │   ├── deploy_firewall.py          # Staging deployer with py_compile & LKG rollback
@@ -137,15 +145,16 @@ finest-computer-use/
 │   ├── fixtures/                   # Test fixtures and incident scenarios
 │   ├── mock_ui/                    # Standalone HTML mock UI testbed
 │   │   └── mock_ui.html
+│   ├── test_fresh_install.py       # Clean-machine onboarding lifecycle test suite (31 tests)
 │   └── run_firewall_regression.py  # 35-test comprehensive regression runner
-├── CHANGELOG.md                    # Architecture release notes (v1.0.0)
+├── CHANGELOG.md                    # Architecture release notes (v1.1.0)
 ├── CONTRIBUTING.md                 # Contribution guidelines and staging requirements
 ├── LICENSE                         # MIT License
 ├── MANIFEST.json                   # Cryptographic manifest of release artifacts
 ├── pyproject.toml                  # Python package metadata (Python 3.9+)
 ├── README.md                       # This documentation
 ├── SECURITY.md                     # Security policy, vulnerability disclosures
-└── VERSION                         # 1.0.0
+└── VERSION                         # 1.1.0
 ```
 
 ---
@@ -153,36 +162,48 @@ finest-computer-use/
 ## 4. Quickstart
 
 ### Prerequisites
-- macOS 13+ (Ventura, Sonoma, Sequoia) or Linux (for CLI/headless validation)
-- Python 3.9+
-- Antigravity 2.0+ (or compatible agentic runtime)
-- Peekaboo MCP server (for desktop computer use)
+- **macOS 15.0+ (Sequoia)** required for live desktop GUI automation with Peekaboo 4.3+ (or Linux for portable CI/headless tests)
+- **Python 3.9+** (uses standard library only)
+- **Antigravity 2.0+**
+- **Peekaboo CLI**: `brew install steipete/tap/peekaboo`
 
-### 1. Clone & Verify
+### 1. One-Command Setup (Recommended)
+Clone the repository and run the onboarding bootstrap orchestrator:
+
 ```bash
 git clone https://github.com/enriquemdev/finest-computer-use.git
 cd finest-computer-use
 
-# Run the 30-point health check
-python3 scripts/firewall_healthcheck.py
-
-# Run the 35-test comprehensive regression suite
-python3 tests/run_firewall_regression.py
+# One-command onboarding (detects Antigravity, registers Peekaboo MCP, installs hooks & policies, runs doctor)
+python3 scripts/bootstrap.py
 ```
 
-### 2. Install into Antigravity
-The installer creates a timestamped backup, validates syntax via `py_compile`, installs the runtime to `~/.gemini/config/skills/computer-use/scripts/`, registers hooks in `~/.gemini/config/hooks.json`, and merges policy into `~/.gemini/GEMINI.md`:
+To test without touching any files:
+```bash
+python3 scripts/bootstrap.py --dry-run
+```
+
+### 2. Environment Diagnostics
+Check system prerequisites, TCC permissions, MCP registration, and runtime integrity at any time:
 
 ```bash
-python3 scripts/install.py
+python3 scripts/doctor.py
 ```
 
-If the post-installation healthcheck detects any fault, it immediately rolls back to the previous backup state.
+### 3. Safe Runtime Smoke Test
+Verify that background semantic inspection works and unanchored coordinate clicks are actively blocked:
 
-### 3. Uninstall / Revert
 ```bash
-python3 scripts/uninstall.py
+python3 scripts/smoke_test.py
 ```
+
+### 4. Advanced Installation Options
+If you prefer fine-grained step-by-step control:
+- Run installer directly: `python3 scripts/install.py`
+- Uninstall and restore prior state: `python3 scripts/uninstall.py`
+- Run 30-point firewall healthcheck: `python3 scripts/firewall_healthcheck.py`
+- Run 35-test regression suite: `python3 tests/run_firewall_regression.py`
+- Run 31-test clean-machine lifecycle suite: `python3 tests/test_fresh_install.py`
 
 ---
 
@@ -236,6 +257,26 @@ STARTING FULL COMPUTER USE SAFETY v1 REGRESSION SUITE (35 TESTS)
 =====================================================================
 ALL 35 REGRESSION TESTS PASSED WITH 100% SUCCESS (TESTS A-AF + E2E 1-3)
 =====================================================================
+```
+
+### Clean-Machine Onboarding & Lifecycle Test Suite
+Validates simulated virgin installations, dry-run zero-mutation, idempotence, user config preservation, clean uninstallation, and staged rollback:
+
+```bash
+python3 tests/test_fresh_install.py
+```
+
+```
+=================================================================
+FRESH INSTALL HARNESS SUMMARY: 31 PASSED, 0 FAILED
+=================================================================
+```
+
+### Acceptance Audit & Certification
+For comprehensive acceptance certification on any target Mac:
+
+```bash
+python3 scripts/fresh_mac_acceptance.py
 ```
 
 ---

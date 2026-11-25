@@ -453,7 +453,7 @@ def main():
         sys.exit(0)
     except Exception as e:
         sys.stderr.write(f"[SafeHook Bootstrap Error]: {e}\n")
-        print(json.dumps({"decision": "allow"}))
+        print(json.dumps({"decision": "deny", "reason": "Protection exception: fail closed"}))
         sys.exit(0)
 
 if __name__ == "__main__":

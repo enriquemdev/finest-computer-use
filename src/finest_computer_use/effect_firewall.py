@@ -576,7 +576,7 @@ def consume_commit_receipt(
 
         if target_rcpt_id and target_rcpt_id in receipts:
             target_receipt = receipts[target_rcpt_id]
-        else:
+        elif not target_rcpt_id:
             now = time.time()
             for r_id, r in receipts.items():
                 if not r.get("used", False) and r.get("expires_at", 0) >= now:
@@ -588,6 +588,9 @@ def consume_commit_receipt(
 
         if not target_receipt:
             return False, "No valid active commit receipt found for proposed effect"
+
+        if target_receipt.get("target") != target:
+            return False, "Commit receipt bound to a different target"
 
         if target_receipt.get("used", False):
             return False, "Commit receipt has already been consumed (single-use barrier)"
@@ -602,7 +605,7 @@ def consume_commit_receipt(
         if target_receipt.get("effect") != effect:
             return False, f"Commit receipt authorizes '{target_receipt.get('effect')}', not '{effect}'"
 
-        if target_receipt.get("app") and app and target_receipt.get("app").lower() != app.lower():
+        if target_receipt.get("app", "").lower() != app.lower():
             return False, f"Commit receipt bound to app '{target_receipt.get('app')}', not '{app}'"
 
         # Atomically consume
